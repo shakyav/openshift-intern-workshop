@@ -62,6 +62,12 @@ We need to deploy our application now. To verify you are successfully logged int
 oc project
 ```
 
+If there is no project you could use, create a new one:
+
+```
+oc new-project <YOUR_NAME>-intern-workshop
+```
+
 OpenShift/Kubernetes use JSON and YAML format to describe the deployment artifacts. You can find all the artifacts in YAML format in `openshift/` directory
 
 To deploy whole application, you can pass a directory to oc **apply** command:
@@ -74,7 +80,7 @@ Go to OpenShift Console and you should see a **build** running. Wait for the bui
 
 ### Fix the port
 
-If you tried to access the application URL you were probably presented with *Application is not available" error. This could happen from various reasons, but the first thing we can check is whether our hostname and port in Flask application are configured properly.
+If you tried to access the application URL you were probably presented with *Application is not available* error. This could happen from various reasons, but the first thing we can check is whether our hostname and port in Flask application are configured properly.
 
 Look at the last line in `app.py` file - you'll see we load the port from environment variable or use port `5000` as a default. Also look at the deployment config in `openshift/app.deploymentconfg.yaml` and focus on 2 things:
 
@@ -95,9 +101,15 @@ Once the application is redeployed, you should get response like this:
 
 ### Service account & roles
 
-To get through the authentication you need to provide the URL with a secret in a query parameter, so try to add `?secret=secret` to the application address.
+To get through the authentication you need to provide the URL with a secret in a query parameter, so try to add
 
-Internal server error - that does not look good - what have we missed. Let's inverstigate logs again - go to OpenShift Console and view the pod logs.
+```
+?secret=secret
+```
+
+to the application address.
+
+**Internal server error** - that does not look good - what have we missed? Let's investigate logs again - go to OpenShift Console > Applications > Pods and view the pod logs.
 
 You will see something like the following error among the log messages:
 
@@ -156,13 +168,13 @@ OpenShift/Kubernetes come with a feature called health checks. There are 2 kinds
 
 Readiness probe is a check which verifies if your application is fully up and running and ready to accept requests.
 
-Liveness probe is used after readiness probe succeeds to verify application is still fully up and alive.
+Liveness probe is used after readiness probe succeeds to repeatedly verify application is still fully up and alive.
 
 If something fails in the container without actually failing the whole container or pod, you app may end up in inconsistent state. The simplest way to get to a consistent state is to restart the application - if readiness or liveness probe fail, OpenShift will restart the pod to get to a consistent state.
 
 #### Readiness Probe
 
-Go to OpenShift Console > Applications > Deployments > openshift-intern-workshop. Then select Actions > Edit Health Checks on the right. Click Add Readiness Probe.
+Go to *OpenShift Console > Applications > Deployments > openshift-intern-workshop*. Then select *Actions > Edit Health Checks* on the right. Click *Add Readiness Probe*.
 
 Look at the `app.py` - which of the API calls would you use for this (hint: health)? Add the path (including leading forward slash) to the Path field. You can leave the rest as is. Click Save.
 
@@ -170,7 +182,7 @@ Once your application is redeployed it will verify it is started up properly bef
 
 #### Liveness Probe
 
-Let's add the Liveness Probe the hard way:). Go back to OpenShift Console > Applications > Deployments > openshift-intern-worksho again, but this time click Actions > Edit YAML.
+Let's add the Liveness Probe the hard way:). Go back to *OpenShift Console > Applications > Deployments > openshift-intern-workshop* again, but this time click *Actions > Edit YAML*.
 
 Find the `readinessProbe` section, duplicate it and change the name to `livenessProbe`. Make sure the indentation is the same and you pasted the whole block right below the readiness probe block.
 
@@ -181,9 +193,34 @@ Readiness Probe: GET /health on port 8080 (HTTP) 1s timeout
 Liveness Probe: GET /health on port 8080 (HTTP) 1s timeout
 ```
 
+### Resource limits
+
+Another important feature of OpenShift and Kubernetes is to make sure your application has enough resources, but at the same time does not consume more than an administrator allows. For this it exposes resource **requests** and **limits** in the pod specification.
+
+#### Limits
+
+First, let's set limits. Limits make sure that your application does not consume too many resources and OpenShift will kill the container if it does.
+
+We will do this similarly to how we set readiness probe - via the console. Go to *Console > Applications > Deployments > openshift-intern-workshop > Action > Edit Resource Limits*.
+
+You can see that there are some values preconfigured as defaults. Let's limit our application to `200` milicores and `600` megabytes of RAM. Fill those values in *Limit* fields and click *Save*.
+
+#### Requests
+
+Requests make sure your application is deployed in a way and on a node which provides enough free resources.
+
+We will configure requests similarly to how we configured the liveness probe - go to *OpenShift Console > Applications > Deployments > openshift-intern-workshop > Actions > Edit YAML*. Locate `limits` section, duplicate it (make sure indentation is correct) and change it's name to `requests`. No change the values - set memory to `300Mi` and cpu to `100m` and click *Save*
+
+You should see this in the pod details view
+
+```
+CPU: 100 millicores to 200 millicores
+Memory: 300 MiB to 600 MiB
+```
+
 ### Changing the code
 
-Our application uses Source-To-Image (or S2I). S2I is a smart tool which makes it easy to build application container images. Look at the `openshift/app.buildconfig.yaml` to see how the S2I strategy is configured.
+Our application uses [Source-To-Image](https://github.com/openshift/source-to-image) (or S2I). S2I is a smart tool which makes it easy to build application container images. Look at the `openshift/app.buildconfig.yaml` to see how the S2I strategy is configured.
 
 You can notice we need to provide 3 pieces of information
 
@@ -191,7 +228,7 @@ You can notice we need to provide 3 pieces of information
 * Source repository
 * Output image
 
-Source image is a contiainer image which was designed for working with S2I - in other words contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble
+Source image is a contiainer image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
 
 Source repository is a git repository containing application in a language matching the one of a source container image, so that the tools in the source image know how to install the application.
 
@@ -215,7 +252,7 @@ Once the build is finished, OpenShift will automatically redeploy our applicatio
 
 #### Setting up webhooks
 
-Webhooks are a powerfull automation feature provided by both - OpenShift and Github. OpenShift will act as a reciever of a webhook request and Github will produce webhook calls when we push to the repository.
+Webhooks are a powerful automation feature provided by both OpenShift and Github. OpenShift will act as a reciever of a webhook request and Github will produce webhook calls when we push to the repository.
 
 First go to OpenShift Console > Builds > Builds > openshift-intern-workshop > Configuration and copy the *Github Webhook URL*.
 
@@ -256,7 +293,7 @@ You are now making changes to your code in a new branch, but the build config is
 oc edit bc openshift-intern-workshop
 ```
 
-Find a section `source` and in there find `uri`, which should point to your repository fork. Add the following line right under the `uri` field and make sure the indentation is the same
+Find a section `source` and in there find `uri`, which should point to your repository fork (Make sure it has correct value too!). Add the following line right under the `uri` field and make sure the indentation is the same
 
 ```
 ref: feature/services
@@ -270,7 +307,7 @@ You can now commit and push your changes
 git commit -a -m "Add service list to API"
 git push --set-upstream origin feature/services
 ```
-Look at the OpenShift Console > Builds > Builds > openshift-intern-workshop > History - you will see a new build running, if your webhook is configured correctly. Wait for the build and following deployment to finish and reload your application - you should see a service listed there as well now.
+Look at the *OpenShift Console > Builds > Builds > openshift-intern-workshop > History* - you will see a new build running, if your webhook is configured correctly. Wait for the build and following deployment to finish and reload your application - you should see a service listed there as well now.
 
 ### Adding persistent volumes
 
@@ -317,9 +354,9 @@ curl $APP_URL/iam
 
 As you can see, the value is gone. So let's make sure it gets properly persisted next time - let's add a **persisten volume** to our application. OpenShift uses something called **dynamic provisioning** to generate persistent volume based on **persistent volume claims** (or PVCs). Our task is only to create a PVC artifact and attach it to the pod and OpenShift will handle the rest.
 
-Ideally you would do this by adding another YAML files to your git repository, but for the sake of simplicity, let's do it manually form the OpenShift Console. Go to the console > Applications > Deployments > openshift-intern-workshop > Actions > Add storage.
+Ideally you would do this by adding another YAML files to your git repository, but for the sake of simplicity, let's do it manually form the OpenShift Console. Go to the *console > Applications > Deployments > openshift-intern-workshop > Actions > Add storage*.
 
-Give your new PVC a name and size (e.g. 1 GB). Click Create. Then provide a mount path - if you look into `app.py` file, you'll notice that the value submitted to the `/iam` endpoint is stored in a file `./iam`. The full path to the file is `/opt/app-root/src/iam`. As the `/opt/app-root/src` directory contains our application, we will want to persist the file in a subdirectory. For that set the *Mount Path* to
+Click *Create storage*. Give your new PVC a name and size (e.g. 1 GB). Click Create. Then provide a mount path - if you look into `app.py` file, you'll notice that the value submitted to the `/iam` endpoint is stored in a file `./iam`. The full path to the file is `/opt/app-root/src/iam`. As the `/opt/app-root/src` directory contains our application, we will want to persist the file in a subdirectory. For that set the *Mount Path* to
 
 ```
 /opt/app-root/src/data
@@ -363,3 +400,7 @@ and when it comes back up, see that the value is still there
 ```
 curl $APP_URL/iam
 ```
+
+# Learn more
+
+Want to learn more? Go to http://learn.openshift.com/ and try more free workshops.
