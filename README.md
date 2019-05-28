@@ -129,7 +129,6 @@ oc adm policy add-role-to-user view -z default
 
 If the command succeeded, you will be able to reload the app URL and get back a JSON response.
 
-
 ### Change default secret
 
 Let's look at **secrets** now. Secrets and Config Maps are resources used for app configuration. Our application uses one secret as well - `openshift/app.secret.yaml`. Take a look at it.
@@ -216,6 +215,32 @@ You should see this in the pod details view
 ```
 CPU: 100 millicores to 200 millicores
 Memory: 300 MiB to 600 MiB
+```
+
+### Scaling
+
+Now that we have set our memory and CPU requests, we can try to scale our application.
+
+As we are loading the information about running pods directly from OpenShift API, we can try to change number of pods and see if the API response changes
+
+```
+oc scale --replicas=5 dc openshift-intern-workshop
+```
+
+Go to your app URL and reload it couple times - you will see the list of pods is longer now.
+
+Now that the application is running in multiple replicas, we would like to see some load balancing. Look at the name in the `me` field - take that value and use it in next command to kill that container
+
+```
+oc delete pod <CONTENT_OF_ME_FIELD>
+```
+
+Now if you reload your browser tab, you will see the value in `me` field changed - i.e. the traffic goes to a different pod as the original one no longer exists.
+
+Let's scale our deployment down again to make sure we don't disrupt the cluster and that redeployment does not take unnecessarily long time
+
+```
+oc scale --replicas=1 dc openshift-intern-workshop
 ```
 
 ### Changing the code
