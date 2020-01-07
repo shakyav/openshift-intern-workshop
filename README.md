@@ -2,29 +2,38 @@
 
 ### Install OpenShift client tools
 
-Install via DNF
+Download the oc client binary: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.2.7/
 
+Extract the client, for example:
 ```
-dnf install origin-clients
+tar -xvf openshift-client-linux-4.2.7.tar.gz
 ```
 
-or donwload from Github - https://github.com/openshift/origin/releases/tag/v3.11.0
+You can now move the client into your `$PATH`, for example:
+
+`mv oc /home/$USER/bin` (you may need to create the directory)
+
+or you can use the client with a relative path: `./oc`
+
+For the rest of the tutorial we will assume the `oc` client is in your path.
 
 ### Get code
 
-Fork this repository (https://github.com/vpavlin/openshift-intern-workshop/fork) and clone it to your machine
+Fork this repository (https://github.com/patrickdillon/openshift-intern-workshop/fork) and clone it to your machine
 
 ### Login to the OpenShift cluster
 
-You can either use your username and password
+We will use a 4.2 OpenShift cluster from the Red Hat Product Demo System for this workshop.
 
+You can either use your username and password:
 ```
 oc login https://<CLUSTER_URL>:8443 -u <USERNAME>
 ```
 
-or you can use authentication token. To get a token, go to OpenShift Console, login, click your username in the top right corner and click *Copy Login Command*.
+or you can use authentication token. To get a token, go to OpenShift Console, login, click your username in the top right corner and click Copy Login Command.
 
 The whole command will be copied and you only need to paste it in the terminal and run it.
+
 
 ### Install Python ecosystem specific packaging tools
 
@@ -113,7 +122,7 @@ To get through the authentication you need to provide the URL with a secret in a
 ?secret=secret
 ```
 
-**Internal server error** - that does not look good - what have we missed? Let's investigate logs again - go to OpenShift Console > Applications > Pods and view the pod logs.
+**Internal server error** - that does not look good - what have we missed? Let's investigate logs again - go to OpenShift Console > Workloads > Pods and view the pod logs.
 
 You will see something like the following error among the log messages:
 
@@ -178,26 +187,52 @@ Liveness probe is used after readiness probe succeeds to repeatedly verify appli
 
 If something fails in the container without actually failing the whole container or pod, you app may end up in inconsistent state. The simplest way to get to a consistent state is to restart the application - if readiness or liveness probe fail, OpenShift will restart the pod to get to a consistent state.
 
-#### Readiness Probe
+#### Health Checks: Liveness & Readiness Probe
 
-Go to *OpenShift Console > Applications > Deployments > openshift-intern-workshop*. Then select *Actions > Edit Health Checks* on the right. Click *Add Readiness Probe*.
+Health checks can be used to determine that a container is functioning properly.
 
-Look at the `app.py` - which of the API calls would you use for this (hint: health)? Add the path (including leading forward slash) to the Path field. You can leave the rest as is. Click Save.
+For our application, look at `app.py` and you will see a path called "health" which we can use in our health check.
 
-Once your application is redeployed it will verify it is started up properly before OpenShift sends any traffic to the pod.
+Let's create a liveness probe.
 
-#### Liveness Probe
+Go *OpenShift Console > Workloads > Deployment Configs > openshift-intern-workshop* and click *YAML*.
 
-Let's add the Liveness Probe the hard way:). Go back to *OpenShift Console > Applications > Deployments > openshift-intern-workshop* again, but this time click *Actions > Edit YAML*.
 
-Find the `readinessProbe` section, duplicate it and change the name to `livenessProbe`. Make sure the indentation is the same and you pasted the whole block right below the readiness probe block.
+You will see a section that looks like this:
+```
+[...]
+containers:
+  - resources: {}
+    terminationMessagePath: /dev/termination-log
+    name: openshift-intern-workshop
+    env:
+      - name: PORT
+        value: '8080'
+[...]
+```
 
-Click Save and wait for a new deployment. If you go to Applications > Pods and open the latest openshift-intern-workshop pod, you should see both readiness and liveness probes mentioned on the right
+We need to add a `livenessProbe` to our `openshift-intern-workshop` container.
 
 ```
-Readiness Probe: GET /health on port 8080 (HTTP) 1s timeout
-Liveness Probe: GET /health on port 8080 (HTTP) 1s timeout
+containers:
+  - resources: {}
+    terminationMessagePath: /dev/termination-log
+    name: openshift-intern-workshop
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 15
+      timeoutSeconds: 1
+    env:
+      - name: PORT
+        value: '8080'
+[...]
 ```
+
+Click Save and wait for a new deployment. If you click *Pods*, open the latest openshift-intern-workshop pod and select the `openshift-intern-workshop` container, you should see both the liveness probe registered on the left hand side.
+
+Readiness probes can be created in the same way by replacing `livenessProbe` with `readinessProbe`. Readiness probes are used to determine whether traffic should be sent to a container. Liveness probes are used to determine whether a container should be killed an restarted based on its restart policy.
 
 ### Resource limits
 

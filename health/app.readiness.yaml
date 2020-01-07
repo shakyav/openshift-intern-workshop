@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    test: readiness
+  name: readiness-http
+spec:
+  containers:
+  - name: readiness-http
+    image: k8s.gcr.io/readiness
+    args:
+    - /server
+    readinessProbe:
+      httpGet:
+        # host: my-host
+        # scheme: HTTPS
+        path: /health
+        port: 8080
+        httpHeaders:
+        - name: X-Custom-Header
+          value: Awesome
+      initialDelaySeconds: 15
+      timeoutSeconds: 1
