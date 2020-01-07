@@ -76,7 +76,11 @@ To deploy whole application, you can pass a directory to oc **apply** command:
 oc apply -f openshift/
 ```
 
-Go to OpenShift Console and you should see a **build** running. Wait for the build to finish and for the deployment to proceed. Then try to access the **route** URL
+Go to OpenShift Console and you should see a **build** running. Wait for the build to finish and for the deployment to proceed. Then try to access the **route** URL. You can get the URL under `HOST/PORT` by:
+
+```
+$ oc get route
+```
 
 ### Fix the port
 
@@ -87,13 +91,15 @@ Look at the last line in `app.py` file - you'll see we load the port from enviro
 * a field `containerPort` in containers section
 * an environment variabe `PORT`
 
-As you can see these do not match. As changing `containerPort` would also require changing the **service** ports definition, we'll go for the envirnment variable and change it to `8080` to match the exposed port. We need to update the deployment config in the cluster. We can do this by running
+As you can see these do not match. As changing `containerPort` would also require changing the **service** ports definition, we'll go for the envirnment variable.
+
+Go ahead and change the `5000` to `8080` to match the exposed port in the `openshift/app.deploymentconfig.yaml` file. We will then need to update the deployment config in the cluster by running
 
 ```
 oc apply -f openshift/app.deploymentconfig.yaml
 ```
 
-Once the application is redeployed, you should get response like this:
+Once the application is redeployed, try to access the **route** URL again. You should get response like this:
 
 ```
 {"msg":"Forbidden","status":403}
@@ -101,13 +107,11 @@ Once the application is redeployed, you should get response like this:
 
 ### Service account & roles
 
-To get through the authentication you need to provide the URL with a secret in a query parameter, so try to add
+To get through the authentication you need to provide the URL with a secret in a query parameter, so try to append the following to your **route** URL:
 
 ```
 ?secret=secret
 ```
-
-to the application address.
 
 **Internal server error** - that does not look good - what have we missed? Let's investigate logs again - go to OpenShift Console > Applications > Pods and view the pod logs.
 
@@ -127,7 +131,10 @@ We will need to add a **view** role for the SA and we can do this by running the
 oc adm policy add-role-to-user view -z default
 ```
 
-If the command succeeded, you will be able to reload the app URL and get back a JSON response.
+If the command succeeded, you will be able to reload the app URL and get back a JSON response such as:
+```json
+{"me":"openshift-intern-workshop-x-xxxxx","pods":["openshift-intern-workshop-x-xxxxx"],"routes":["openshift-intern-workshop"],"services":[]}
+```
 
 ### Change default secret
 
@@ -159,7 +166,7 @@ As secrets and config maps are mainly used in environment variables (which canno
 oc rollout latest openshift-intern-workshop
 ```
 
-Once the deployment is finished, you will need to provide a new secret in the URL to be able to access the application.
+Once the deployment is finished, you will need to provide a new secret in the URL to be able to access the application by attaching `?secret=<MYNEWSECRET>` to the **route** URL.
 
 ### Health checks
 
