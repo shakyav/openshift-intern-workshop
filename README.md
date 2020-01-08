@@ -95,7 +95,7 @@ $ oc get route
 
 If you tried to access the application URL you were probably presented with *Application is not available* error. This could happen from various reasons, but the first thing we can check is whether our hostname and port in Flask application are configured properly.
 
-Look at the last line in `app.py` file - you'll see we load the port from environment variable or use port `5000` as a default. Also look at the deployment config in `openshift/app.deploymentconfg.yaml` and focus on 2 things:
+Look at the last line in [app.py](./app.py) file - you'll see we load the port from environment variable or use port `5000` as a default. Also look at the deployment config in [openshift/app.deploymentconfg.yaml](openshift/app.deploymentconfg.yaml) and focus on 2 things:
 
 * a field `containerPort` in containers section
 * an environment variabe `PORT`
@@ -147,7 +147,7 @@ If the command succeeded, you will be able to reload the app URL and get back a 
 
 ### Change default secret
 
-Let's look at **secrets** now. Secrets and Config Maps are resources used for app configuration. Our application uses one secret as well - `openshift/app.secret.yaml`. Take a look at it.
+Let's look at **secrets** now. Secrets and Config Maps are resources used for app configuration. Our application uses one secret as well - [openshift/app.secret.yaml](openshift/app.secret.yaml). Take a look at it.
 
 The interesting part is in section `data`, but you cannot easily read it. The secret is obfuscated by **base64** encoding to make it slightly harder to leak it by showing to someone. If we want to read it, we can copy the value and pass it through the base64 decoder
 
@@ -191,7 +191,7 @@ If something fails in the container without actually failing the whole container
 
 Health checks can be used to determine that a container is functioning properly.
 
-For our application, look at `app.py` and you will see a path called "health" which we can use in our health check.
+For our application, look at [app.py](./app.py) and you will see a path called "health" which we can use in our health check.
 
 Let's create a liveness probe.
 
@@ -211,7 +211,7 @@ containers:
 [...]
 ```
 
-We need to add a `livenessProbe` to our `openshift-intern-workshop` container.
+We need to add a `livenessProbe` to our `openshift-intern-workshop` container. Please note that the ordering of the fields below are not important but the `livenessProbe` section has to indented correctly.
 
 ```
 containers:
@@ -230,7 +230,7 @@ containers:
 [...]
 ```
 
-Click Save and wait for a new deployment. If you click *Pods*, open the latest openshift-intern-workshop pod and select the `openshift-intern-workshop` container, you should see both the liveness probe registered on the left hand side.
+Click Save and wait for a new deployment. If you click *Pods*, open the latest openshift-intern-workshop pod and select the `openshift-intern-workshop` container, you should see the liveness probe registered on the left hand side.
 
 Readiness probes can be created in the same way by replacing `livenessProbe` with `readinessProbe`. Readiness probes are used to determine whether traffic should be sent to a container. Liveness probes are used to determine whether a container should be killed an restarted based on its restart policy.
 
@@ -287,7 +287,7 @@ oc scale --replicas=1 dc openshift-intern-workshop
 
 ### Changing the code
 
-Our application uses [Source-To-Image](https://github.com/openshift/source-to-image) (or S2I). S2I is a smart tool which makes it easy to build application container images. Look at the `openshift/app.buildconfig.yaml` to see how the S2I strategy is configured.
+Our application uses [Source-To-Image](https://github.com/openshift/source-to-image) (or S2I). S2I is a smart tool which makes it easy to build application container images. Look at the [openshift/app.buildconfig.yaml](openshift/app.buildconfig.yaml) to see how the S2I strategy is configured.
 
 You can notice we need to provide 3 pieces of information
 
@@ -295,7 +295,7 @@ You can notice we need to provide 3 pieces of information
 * Source repository
 * Output image
 
-Source image is a contiainer image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
+Source image is a container image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
 
 Source repository is a git repository containing application in a language matching the one of a source container image, so that the tools in the source image know how to install the application.
 
@@ -315,11 +315,11 @@ oc start-build openshift-intern-workshop --from-dir=. -F
 
 Start build command will start new build in OpenShift and `--from-dir` will collect contents of a given directory, compress it and send it to OpenShift as a context directory for the new build. Parameter `-F` fill redirect logs from the build to the terminal, so that you can easily look at how the build progresses.
 
-Once the build is finished, OpenShift will automatically redeploy our application - this happens based on **triggers** defined in `openshift/app.deploymentconfig.yaml`
+Once the build is finished, OpenShift will automatically redeploy our application - this happens based on **triggers** defined in [openshift/app.deploymentconfig.yaml](openshift/app.deploymentconfig.yaml)
 
 #### Setting up webhooks
 
-Webhooks are a powerful automation feature provided by both OpenShift and Github. OpenShift will act as a reciever of a webhook request and Github will produce webhook calls when we push to the repository.
+Webhooks are a powerful automation feature provided by both OpenShift and Github. OpenShift will act as a receiver of a webhook request and Github will produce webhook calls when we push to the repository.
 
 First go to OpenShift Console > Builds > Builds > openshift-intern-workshop > Configuration and copy the *Github Webhook URL*.
 
@@ -431,7 +431,7 @@ Click *Create storage*. Give your new PVC a name and size (e.g. 1 GB). Click Cre
 
 and click *Add*.
 
-We need to change the path in the source code as well - edit the `app.py` file and set the `IAM_FILE` value to `/opt/app-root/src/data/iam` - the line will now look like this:
+We need to change the path in the source code as well - edit the [app.py](./app.py) file and set the `IAM_FILE` value to `/opt/app-root/src/data/iam` - the line will now look like this:
 
 ```
 IAM_FILE = "/opt/app-root/src/data/iam"
