@@ -236,28 +236,60 @@ Readiness probes can be created in the same way by replacing `livenessProbe` wit
 
 ### Resource limits
 
-Another important feature of OpenShift and Kubernetes is to make sure your application has enough resources, but at the same time does not consume more than an administrator allows. For this it exposes resource **requests** and **limits** in the pod specification.
+Another important feature of OpenShift and Kubernetes is to make sure your application has enough resources, but at the same time does not consume more than an administrator allows. For this, we use resource **requests** and **limits** in the pod specification.
 
 #### Limits
 
-First, let's set limits. Limits make sure that your application does not consume too many resources and OpenShift will kill the container if it does.
+First, let's set the limits. Limits ensure that your application does not consume too many resources and OpenShift controller will kill the container if it does.
 
-We will do this similarly to how we set readiness probe - via the console. Go to *Console > Applications > Deployments > openshift-intern-workshop > Action > Edit Resource Limits*.
+We will do this by changing the `DeploymentConfig`. In your local directory, edit file `./openshift/app.deploymentconfig.yaml` and change `resources: {}` part of the yaml from:
+```yaml
+spec:
+...
+  template:
+  ...
+    spec:
+      containers:
+      - env:
+        ...
+        imagePullPolicy: Always
+        name: openshift-intern-workshop
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+```
+to:
+```yaml
+        resources:
+          limits:
+            cpu: 200m
+            memory: 600Mi
+```
 
-You can see that there are some values preconfigured as defaults. Let's limit our application to `200` milicores and `600` megabytes of RAM. Fill those values in *Limit* fields and click *Save*.
+which limits our application to `200` milicores and `600` megabytes of RAM. Save this file and apply the changes by:
+
+```bash
+oc apply -f ./openshift/app.deploymentconfig.yaml
+```
 
 #### Requests
 
 Requests make sure your application is deployed in a way and on a node which provides enough free resources.
 
-We will configure requests similarly to how we configured the liveness probe - go to *OpenShift Console > Applications > Deployments > openshift-intern-workshop > Actions > Edit YAML*. Locate `limits` section, duplicate it (make sure indentation is correct) and change it's name to `requests`. No change the values - set memory to `300Mi` and cpu to `100m` and click *Save*
+We will configure requests on the console by changing its `yaml` file. On the left-hand side, go to `Workloads` -> `Deployment Configs` -> `YAML`. Here you can see the exact same yaml file as your updated `./openshift/app.deploymentconfig.yaml`. Update the resource as the following making requests as another entry to the resources. Click on `save` to apply the change.
 
-You should see this in the pod details view
+```yaml
+        resources:
+          limits:
+            cpu: 200m
+            memory: 600Mi
+          requests:
+            cpu: 60m
+            memory: 300Mi
+```
 
-```
-CPU: 100 millicores to 200 millicores
-Memory: 300 MiB to 600 MiB
-```
+You can see under `Workloads` -> `Pods` where an instance of pod is terminating as well as another one is spinning up. You can verify these changes are applied to the pod by investigating its YAML file under `container.resources`.
 
 ### Scaling
 
@@ -295,7 +327,7 @@ You can notice we need to provide 3 pieces of information
 * Source repository
 * Output image
 
-Source image is a contiainer image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
+Source image is a container image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
 
 Source repository is a git repository containing application in a language matching the one of a source container image, so that the tools in the source image know how to install the application.
 
@@ -378,7 +410,7 @@ Look at the *OpenShift Console > Builds > Builds > openshift-intern-workshop > H
 
 ### Adding persistent volumes
 
-Sometimes an application needs some persisentcy. The most classic example are databases - without a persistent volume all the data you store would be lost on container restart - and restarts happen a lot in a distributed cloud environment.
+Sometimes an application needs some persistency. The most classic example are databases - without a persistent volume all the data you store would be lost on container restart - and restarts happen a lot in a distributed cloud environment.
 
 To simulate this situation, we have an endpoint in our app which stores a value in a file. First get the route of the app and store it in environment variable
 
@@ -394,7 +426,7 @@ curl $APP_URL/iam
 
 You will see a message: `Could not find the 'iam' file`
 
-We need to set the value first by doing a POST request to the enpoint
+We need to set the value first by doing a POST request to the endpoint
 
 ```
 curl -X POST $APP_URL/iam/<YOUR_NAME_HERE>
@@ -419,7 +451,7 @@ Hit the endpoint again when the pod comes back up
 curl $APP_URL/iam
 ```
 
-As you can see, the value is gone. So let's make sure it gets properly persisted next time - let's add a **persisten volume** to our application. OpenShift uses something called **dynamic provisioning** to generate persistent volume based on **persistent volume claims** (or PVCs). Our task is only to create a PVC artifact and attach it to the pod and OpenShift will handle the rest.
+As you can see, the value is gone. So let's make sure it gets properly persisted next time - let's add a **persistent volume** to our application. OpenShift uses something called **dynamic provisioning** to generate persistent volume based on **persistent volume claims** (or PVCs). Our task is only to create a PVC artifact and attach it to the pod and OpenShift will handle the rest.
 
 Ideally you would do this by adding another YAML files to your git repository, but for the sake of simplicity, let's do it manually form the OpenShift Console. Go to the *console > Applications > Deployments > openshift-intern-workshop > Actions > Add storage*.
 
