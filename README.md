@@ -130,7 +130,7 @@ You will see something like the following error among the log messages:
 HTTP response body: b'{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pods is forbidden: User \\"system:serviceaccount:vpavlin-os-ws:default\\" cannot list pods in the namespace \\"vpavlin-os-ws\\": no RBAC policy matched","reason":"Forbidden","details":{"kind":"pods"},"code":403}\n'
 ```
 
-This is becuase our application is trying to access OpenShift API without proper authorization (you can see authentication is ok - OpenShift recognized the provided service account, but it does not have the correct rights to access resources it is trying to access).
+Our application is trying to access OpenShift API without proper authorization (you can see authentication is ok - OpenShift recognized the provided service account, but it does not have the correct rights to access resources it is trying to access).
 
 We need to add a correct **role** to our service account. You can see the error mentions service account (or SA) **default**- The best practice would be to create a separate SA for this use case, but let's just change the default one for now.
 
@@ -171,25 +171,25 @@ Look at the file `openshift/app.deploymentconfig.yaml` and try to find how the s
 
 As secrets and config maps are mainly used in environment variables (which cannot be changed dynamically at runtime from outside of the container), we need to re-deploy our application to pick up new secret.
 
-```
+```bash
 oc rollout latest openshift-intern-workshop
 ```
 
 Once the deployment is finished, you will need to provide a new secret in the URL to be able to access the application by attaching `?secret=<MYNEWSECRET>` to the **route** URL.
 
-### Health checks
 
-OpenShift/Kubernetes come with a feature called health checks. There are 2 kinds of health checks - readiness and liveness probe. These are very important for lifecycle management of your application.
 
-Readiness probe is a check which verifies if your application is fully up and running and ready to accept requests.
 
-Liveness probe is used after readiness probe succeeds to repeatedly verify application is still fully up and alive.
 
 If something fails in the container without actually failing the whole container or pod, you app may end up in inconsistent state. The simplest way to get to a consistent state is to restart the application - if readiness or liveness probe fail, OpenShift will restart the pod to get to a consistent state.
 
 #### Health Checks: Liveness & Readiness Probe
 
-Health checks can be used to determine that a container is functioning properly.
+Health checks are an important tool for the lifecycle managemnet of an application. Readiness and liveness probes can be used to determine that a container is functioning properly.
+
+A readiness probe is a check which verifies if your application is fully up and running and ready to accept requests. When readiness probes fail the container will not be assigned an ip address.
+
+Liveness probes are subsequently used to repeatedly verify the application is up. If a liveness probe fails, the container will be restarted (based on the restart policy).
 
 For our application, look at [app.py](./app.py) and you will see a path called "health" which we can use in our health check.
 
@@ -199,7 +199,7 @@ Go *OpenShift Console > Workloads > Deployment Configs > openshift-intern-worksh
 
 
 You will see a section that looks like this:
-```
+```yaml
 [...]
 containers:
   - resources: {}
@@ -213,7 +213,8 @@ containers:
 
 We need to add a `livenessProbe` to our `openshift-intern-workshop` container. Please note that the ordering of the fields below are not important but the `livenessProbe` section has to indented correctly.
 
-```
+```yaml
+[...]
 containers:
   - resources: {}
     terminationMessagePath: /dev/termination-log
@@ -232,7 +233,7 @@ containers:
 
 Click Save and wait for a new deployment. If you click *Pods*, open the latest openshift-intern-workshop pod and select the `openshift-intern-workshop` container, you should see the liveness probe registered on the left hand side.
 
-Readiness probes can be created in the same way by replacing `livenessProbe` with `readinessProbe`. Readiness probes are used to determine whether traffic should be sent to a container. Liveness probes are used to determine whether a container should be killed an restarted based on its restart policy.
+Readiness probes can be created in the same way by replacing `livenessProbe` with `readinessProbe`.
 
 ### Resource limits
 
@@ -240,62 +241,35 @@ Another important feature of OpenShift and Kubernetes is to make sure your appli
 
 #### Limits
 
-First, let's set the limits. Limits ensure that your application does not consume too many resources and OpenShift controller will kill the container if it does.
+Limits ensure that your application does not consume too many resources and the OpenShift controller will kill the container if it does.
 
-We will do this by changing the `DeploymentConfig`. In your local directory, edit file `./openshift/app.deploymentconfig.yaml` and change `resources: {}` part of the yaml from:
-```yaml
-spec:
-...
-  template:
-  ...
-    spec:
-      containers:
-      - env:
-        ...
-        imagePullPolicy: Always
-        name: openshift-intern-workshop
-        ports:
-        - containerPort: 8080
-          protocol: TCP
-        resources: {}
-```
-to:
-```yaml
-        resources:
-          limits:
-            cpu: 200m
-            memory: 600Mi
-```
-
-which limits our application to `200` milicores and `600` megabytes of RAM. Save this file and apply the changes by:
+We have already edited Kubernetes objects using two methods: `oc edit` and editing YAML through the console. We will change the limits of our application by editing the DeploymentConfig but let's do it in yet another way, the `oc patch` command:
 
 ```bash
-oc apply -f ./openshift/app.deploymentconfig.yaml
+oc patch deploymentconfig openshift-intern-workshop -p '{"spec":{"template":{"spec":{"containers":[{"name":"openshift-intern-workshop", "resources": {"limits": {"memory": "600Mi", "cpu":"200m"}}}]}}}}'
 ```
+
+This limits our application to `200` millicores and `600` megabytes of RAM.
+
 
 #### Requests
 
-Requests make sure your application is deployed in a way and on a node which provides enough free resources.
+Requests make sure your application has sufficient resources.
 
-We will configure requests on the console by changing its `yaml` file. On the left-hand side, go to `Workloads` -> `Deployment Configs` -> `YAML`. Here you can see the exact same yaml file as your updated `./openshift/app.deploymentconfig.yaml`. Update the resource as the following making requests as another entry to the resources. Click on `save` to apply the change.
-
-```yaml
-        resources:
-          limits:
-            cpu: 200m
-            memory: 600Mi
-          requests:
-            cpu: 60m
-            memory: 300Mi
+```bash
+oc patch dc openshift-intern-workshop -p '{"spec":{"template":{"spec":{"containers":[{"name":"openshift-intern-workshop", "resources": {"requests": {"memory": "300Mi", "cpu":"100m"}}}]}}}}'
 ```
 
-You can see under `Workloads` -> `Pods` where an instance of pod is terminating as well as another one is spinning up. You can verify these changes are applied to the pod by investigating its YAML file under `container.resources`.
+Our application now has between 300-600 megabytes of memory and 100-200 millicores of CPU. With `oc describe pod` we can see that our pod now has a [Quality of Service](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/) of burstable:
+```
+QoS Class:       Burstable
+```
 
 ### Scaling
 
-Now that we have set our memory and CPU requests, we can try to scale our application.
+Now that we have set our memory and CPU requests, we can attempt to scale our application.
 
-As we are loading the information about running pods directly from OpenShift API, we can try to change number of pods and see if the API response changes
+As we are loading the information about running pods directly from OpenShift API, we can change the number of pods and see if the API response changes
 
 ```
 oc scale --replicas=5 dc openshift-intern-workshop
@@ -327,7 +301,7 @@ You can notice we need to provide 3 pieces of information
 * Source repository
 * Output image
 
-Source image is a container image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see and example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
+Source image is a container image which was designed for working with S2I - apart from other features it contains `assemble` and `run` scripts - you can see an example here: https://github.com/sclorg/s2i-python-container/blob/master/3.6/s2i/bin/assemble - which are used during build and start of the container.
 
 Source repository is a git repository containing application in a language matching the one of a source container image, so that the tools in the source image know how to install the application.
 
@@ -337,7 +311,7 @@ To be able to successfully build from your own repository, do not forget to chan
 
 #### Building from local directory
 
-When you develop your code you will need to rebuild the container image for your application. Our application was originally built and deployed from a git repository. To be able to quickly rebuild your knew changes you might want to skip the step of pushing your code to a repository and then kicking off the build.
+When you develop your code you will need to rebuild the container image for your application. Our application was originally built and deployed from a git repository. To be able to quickly rebuild your new changes you might want to skip the step of pushing your code to a repository and then kicking off the build.
 
 To do that, you can use (make sure you are in the root of the repository)
 
@@ -353,9 +327,9 @@ Once the build is finished, OpenShift will automatically redeploy our applicatio
 
 Webhooks are a powerful automation feature provided by both OpenShift and Github. OpenShift will act as a receiver of a webhook request and Github will produce webhook calls when we push to the repository.
 
-First go to OpenShift Console > Builds > Builds > openshift-intern-workshop > Configuration and copy the *Github Webhook URL*.
+First go to OpenShift Console > Builds > Build Configs > openshift-intern-workshop > Configuration and *Copy with Secret* the *Github Webhook URL*.
 
-Next go to your Github wokrshop repository and click Setting > Webhooks > Add webhook. Paste the copied URL in *Payload URL*, change *Content type* to `application/json` and disable *SSL verification* and confirm by clicking *Add webhook*.
+Next go to your Github workshop repository and click Setting > Webhooks > Add webhook. Paste the copied URL in *Payload URL*, change *Content type* to `application/json` and disable *SSL verification* and confirm by clicking *Add webhook*.
 
 ### Add services to response
 
