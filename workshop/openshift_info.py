@@ -25,7 +25,11 @@ class OpenShiftWorkshop(object):
         return self._get_running_pods(pod_list)
 
     def get_services(self):
-        return []
+        services_api = self.oapi_client.resources.get(
+                            kind='Service',
+                            api_version='v1')
+        service_list = services_api.get(namespace=self.namespace)
+        return self._get_names(service_list)
 
     def get_self(self):
         return os.environ.get("HOSTNAME")

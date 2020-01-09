@@ -27,7 +27,7 @@ We will use a 4.2 OpenShift cluster from the Red Hat Product Demo System for thi
 
 You can either use your username and password:
 ```
-oc login https://<CLUSTER_URL>:8443 -u <USERNAME>
+oc login https://<CLUSTER_URL>:6443 -u <USERNAME>
 ```
 
 or you can use authentication token. To get a token, go to OpenShift Console, login, click your username in the top right corner and click Copy Login Command.
@@ -45,9 +45,9 @@ dnf install python-pip
 
 ### Configure pre-commit
 
-[Pre-commit](https://pre-commit.com) as a framework for managing and maintaining multi-language pre-commit hooks. The tool is very useful when you are submitting changes to your or upstream repositories as it'll help you to keep the code clean and prevent many potential issues which might be noticed during review or not at all.
+[Pre-commit](https://pre-commit.com) is a framework for managing and maintaining multi-language pre-commit hooks. The tool is useful when you are submitting changes as it helps you keep code clean and prevent potential issues which might be noticed during review or not at all.
 
-To install pre-commit, run
+To install pre-commit, run:
 
 ```
 pip install --user pre-commit
@@ -61,11 +61,11 @@ To install the pre-commit hooks to your git repository run
 pre-commit install
 ```
 
-Now every time you do a git commit a set of checks will be run against your changes and errors will be reported and some even fixed automatically.
+Now, when you `git commit` a set of checks will be run against your changes and errors will be reported or even fixed automatically.
 
 ### Deploy the application
 
-We need to deploy our application now. To verify you are successfully logged into OpenShift, you can run a following command
+We need to deploy our application now. To verify you are successfully logged into OpenShift, you can run the following command:
 
 ```
 oc project
@@ -77,15 +77,15 @@ If there is no project you could use, create a new one:
 oc new-project <YOUR_NAME>-intern-workshop
 ```
 
-OpenShift/Kubernetes use JSON and YAML format to describe the deployment artifacts. You can find all the artifacts in YAML format in `openshift/` directory
+OpenShift/Kubernetes uses JSON and YAML format to describe the deployment artifacts. You can find all the manifests in YAML format in `openshift/` directory
 
-To deploy whole application, you can pass a directory to oc **apply** command:
+To deploy the whole application, you can pass a directory to the oc **apply** command:
 
 ```
 oc apply -f openshift/
 ```
 
-Go to OpenShift Console and you should see a **build** running. Wait for the build to finish and for the deployment to proceed. Then try to access the **route** URL. You can get the URL under `HOST/PORT` by:
+Go to the OpenShift Console and you should see a **build** running. Wait for the build to finish and for the deployment to proceed. Then try to access the **route** URL. You can get the URL under `HOST/PORT` by:
 
 ```
 $ oc get route
@@ -93,9 +93,9 @@ $ oc get route
 
 ### Fix the port
 
-If you tried to access the application URL you were probably presented with *Application is not available* error. This could happen from various reasons, but the first thing we can check is whether our hostname and port in Flask application are configured properly.
+If you tried to access the application URL you were probably presented with *Application is not available* error. This could happen for various reasons, but the first thing we can check is whether our hostname and port in the Flask application are configured properly.
 
-Look at the last line in [app.py](./app.py) file - you'll see we load the port from environment variable or use port `5000` as a default. Also look at the deployment config in [openshift/app.deploymentconfg.yaml](openshift/app.deploymentconfg.yaml) and focus on 2 things:
+Look at the last line in [app.py](./app.py) file - you'll see we load the port from environment variable or use port `5000` as a default. Also look at the deployment config in [openshift/app.deploymentconfig.yaml](openshift/app.deploymentconfig.yaml) and focus on 2 things:
 
 * a field `containerPort` in containers section
 * an environment variabe `PORT`
@@ -169,23 +169,17 @@ oc edit secret openshift-intern-workshop
 
 Look at the file `openshift/app.deploymentconfig.yaml` and try to find how the secret is used there.
 
-As secrets and config maps are mainly used in environment variables (which cannot be changed dynamically at runtime from outside of the container), we need to re-deploy our application to pick up new secret.
+As secrets and config maps are mainly used in environment variables (which cannot be changed dynamically at runtime from outside of the container), we need to re-deploy our application to pick up the new secret.
 
 ```bash
 oc rollout latest openshift-intern-workshop
 ```
 
-Once the deployment is finished, you will need to provide a new secret in the URL to be able to access the application by attaching `?secret=<MYNEWSECRET>` to the **route** URL.
-
-
-
-
-
-If something fails in the container without actually failing the whole container or pod, you app may end up in inconsistent state. The simplest way to get to a consistent state is to restart the application - if readiness or liveness probe fail, OpenShift will restart the pod to get to a consistent state.
+Once the deployment is finished, you will need to provide the new secret in the URL to be able to access the application by attaching `?secret=<MYNEWSECRET>` to the **route** URL.
 
 #### Health Checks: Liveness & Readiness Probe
 
-Health checks are an important tool for the lifecycle managemnet of an application. Readiness and liveness probes can be used to determine that a container is functioning properly.
+Health checks are an important tool for the lifecycle management of an application. Readiness and liveness probes can be used to determine that a container is functioning properly.
 
 A readiness probe is a check which verifies if your application is fully up and running and ready to accept requests. When readiness probes fail the container will not be assigned an ip address.
 
